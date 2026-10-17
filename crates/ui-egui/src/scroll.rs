@@ -70,6 +70,12 @@ pub struct Momentum {
 }
 
 impl Momentum {
+    /// For a device that always reports when the fingers lift (a touch screen): a pause is a
+    /// resting finger, never a lift.
+    pub fn with_lift() -> Self {
+        Self { reports_lift: true, ..Self::default() }
+    }
+
     /// A frame's touchpad delta, `dt` seconds after the previous frame. Non-finite input is ignored.
     pub fn feed(&mut self, delta: Vec2, dt: f32) {
         if !delta.is_finite() || !dt.is_finite() {

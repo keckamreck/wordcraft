@@ -1003,7 +1003,23 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     } else {
         app.canvas.auto_scroll.update(ui, area)
     };
-    let delta = wheel_delta + auto_delta + middle_delta;
+    // Fingers on the page (crate::touch): a swipe moves the page 1:1 and a flick coasts on. Read
+    // Mode turns whole pages, so there a swipe turns one.
+    let touch_delta = {
+        let d = app.touch.scroll(ui.input(|i| i.unstable_dt));
+        let turn = app.touch.take_swipe();
+        if app.session.view.read_mode {
+            app.touch.hit_edge();
+            if turn != 0 {
+                turn_read_page(app, turn as f32);
+                ui.ctx().request_repaint();
+            }
+            egui::Vec2::ZERO
+        } else {
+            d
+        }
+    };
+    let delta = wheel_delta + auto_delta + middle_delta + touch_delta;
     let mut scroll_area = egui::ScrollArea::both()
         .id_salt("canvas_scroll")
         .auto_shrink([false, false])
@@ -1024,6 +1040,9 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         };
         if after == before && wheel_delta != egui::Vec2::ZERO {
             app.canvas.wheel.hit_edge();
+        }
+        if after == before && touch_delta != egui::Vec2::ZERO {
+            app.touch.hit_edge();
         }
         if auto_delta != egui::Vec2::ZERO && after != before {
             // The scroll keeps going without new input.
@@ -1429,6 +1448,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     // The viewport barely moves between frames; the auto-scroll decides this frame's scroll before
     // the scroll area is built, so it reads last frame's viewport.
     app.canvas.viewport = Some(out.inner_rect);
+    app.touch.set_page(out.inner_rect);
     let (resp, rects) = out.inner;
     // A click on the page leaves the selected comment balloon.
     if app.canvas.balloon.is_some()

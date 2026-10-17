@@ -2,13 +2,28 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <!-- interactive-widget: an on-screen keyboard (tablets) shrinks the app instead of covering the page. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, interactive-widget=resizes-content">
   <title>WordCraft</title>
+  <!-- Installable app (Android tablets, ChromeOS, desktop Chrome/Edge): packaging/web/README.md. -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#f0f0f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1f1f1f" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="WordCraft">
+  <link rel="apple-touch-icon" href="icons/wordcraft-192.png">
   <link data-trunk rel="icon" href="../../assets/app-icon/wordcraft.ico" />
+  <link data-trunk rel="copy-file" href="manifest.webmanifest" />
+  <link data-trunk rel="copy-file" href="../../assets/app-icon/web/wordcraft-192.png" data-target-path="icons" />
+  <link data-trunk rel="copy-file" href="../../assets/app-icon/web/wordcraft-512.png" data-target-path="icons" />
+  <link data-trunk rel="copy-file" href="../../assets/app-icon/web/wordcraft-maskable-512.png" data-target-path="icons" />
   <link data-trunk rel="rust" data-bin="wordcraft-web" data-wasm-opt="z" data-weak-refs />
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #e6e6e6; }
-    #wordcraft_canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    /* No pull-to-refresh, tap flash or long-press callout: fingers belong to the app (crates/ui-egui/src/touch.rs). */
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #e6e6e6;
+      overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+    #wordcraft_canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
     #wordcraft_loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
       color: #555; font: 14px system-ui, sans-serif; pointer-events: none; }
   </style>
