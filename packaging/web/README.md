@@ -15,11 +15,14 @@ There is no server-side code. Upload the folder's contents anywhere that serves 
 
 ## Deploy on Vercel
 
-The repository deploys to [Vercel](https://vercel.com) as it is: `vercel.json` at the root tells
-Vercel to run `packaging/web/vercel-build.sh` and serve `dist/web`, with the headers below.
+The repository deploys to [Vercel](https://vercel.com) as it is: `apps/wordcraft-web/vercel.json` tells
+Vercel to run `packaging/web/vercel-build.sh` and serve the site, with the headers below.
 
-1. On vercel.com: **Add New… › Project**, import this GitHub repository and keep every setting
-   Vercel proposes (they come from `vercel.json`; there is no framework preset, no install step).
+1. On vercel.com: **Add New… › Project** and import this GitHub repository. Vercel finds several
+   Rust programs in it; pick **`apps/wordcraft-web` › Import single project** and keep every setting
+   it proposes (they come from that folder's `vercel.json`: no framework preset, no install step).
+   Imported with the repository root as the Root Directory instead, the root `vercel.json` does
+   the same.
 2. **Deploy.** Every later push deploys again by itself: pushes to the default branch go to the
    production URL, pushes to other branches get preview URLs.
 

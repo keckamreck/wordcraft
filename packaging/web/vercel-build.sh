@@ -5,9 +5,19 @@
 # Vercel's build image (Amazon Linux 2023, x86_64) has no Rust, so each build installs it first.
 # Anywhere else, tools already installed at the pinned versions are used as they are:
 #
-#   packaging/web/vercel-build.sh
+#   packaging/web/vercel-build.sh [OUT]
+#
+# OUT (relative to the folder the script starts in) also gets a copy of the site: a Vercel project
+# whose Root Directory is apps/wordcraft-web serves its own dist folder (apps/wordcraft-web/vercel.json).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+OUT=""
+if [ -n "${1:-}" ]; then
+  case "$1" in
+    /*) OUT="$1" ;;
+    *) OUT="$PWD/$1" ;;
+  esac
+fi
 APP=wordcraft
 
 # Pinned, so a deploy builds with what the repository was tested with. Bump them together.
@@ -61,5 +71,10 @@ fi
 if grep -Eq '(src|href)="/[^/]' "$ROOT/dist/web/index.html"; then
   echo "error: dist/web/index.html has root-absolute URLs" >&2
   exit 1
+fi
+if [ -n "$OUT" ]; then
+  mkdir -p "$OUT"
+  cp -R "$ROOT/dist/web/." "$OUT/"
+  echo "copied the site to $OUT"
 fi
 echo "built $ROOT/dist/web"

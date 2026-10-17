@@ -9,3 +9,4 @@ plan/
 /target-*/
 /craft-fonts/
 /.vercel/
+/apps/wordcraft-web/dist/
