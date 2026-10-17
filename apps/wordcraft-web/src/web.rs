@@ -27,6 +27,9 @@ pub fn start() {
             log::error!("missing <canvas id=\"{CANVAS_ID}\">");
             return;
         };
+        if let Err(e) = fingers_from_touch_events_only() {
+            log::error!("touch gestures may select text instead of scrolling: {e}");
+        }
         let dirty = Rc::new(Cell::new(false));
         let saves = AsyncSaves::default();
         if let Err(e) = guard_unload(dirty.clone(), saves.clone()) {
@@ -171,6 +174,30 @@ fn listen_for_pasted_pictures(inbox: Inbox, ctx: egui::Context) -> Result<(), St
     document.add_event_listener_with_callback("paste", on_paste.as_ref().unchecked_ref()).map_err(|e| format!("{e:?}"))?;
     // The listener lives as long as the page.
     on_paste.forget();
+    Ok(())
+}
+
+/// Browsers report a finger twice: as a pointer event, then as a touch event, and eframe makes a
+/// mouse press of each. The `pointerdown` one reaches the app a frame ahead of the touch, before
+/// the page's finger gestures (`wordcraft_ui_egui::touch`) know a finger is down, so a swipe
+/// started a text selection. A finger's `pointerdown` stops at the window, before eframe's
+/// listeners on the canvas; its touch events still press the mouse where the gestures want it.
+/// `pointerup` goes on: eframe runs the app inside it, which Safari needs to let a tapped Copy
+/// write the clipboard.
+fn fingers_from_touch_events_only() -> Result<(), String> {
+    let window = web_sys::window().ok_or("no window")?;
+    let stop = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::PointerEvent)>::new(|e: web_sys::PointerEvent| {
+        if e.pointer_type() == "touch" {
+            e.stop_propagation();
+        }
+    });
+    let options = web_sys::AddEventListenerOptions::new();
+    options.set_capture(true);
+    window
+        .add_event_listener_with_callback_and_add_event_listener_options("pointerdown", stop.as_ref().unchecked_ref(), &options)
+        .map_err(|e| format!("{e:?}"))?;
+    // The listener lives as long as the page.
+    stop.forget();
     Ok(())
 }
 

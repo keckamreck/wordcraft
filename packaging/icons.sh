@@ -35,6 +35,17 @@ done
 mkdir -p "$DIR/hicolor/scalable/apps"
 cp "$SVG" "$DIR/hicolor/scalable/apps/$ID.svg"
 
+# Web app icons (manifest.webmanifest in apps/wordcraft-web): 192 and 512 as drawn, and a maskable 512
+# whose tile fills the square, so the round and squircle masks of Android launchers never show a
+# transparent corner.
+mkdir -p "$DIR/web"
+render "$SVG" 192 "$DIR/web/wordcraft-192.png"
+render "$SVG" 512 "$DIR/web/wordcraft-512.png"
+MASKABLE="$TMP/maskable.svg"
+sed 's/rx="112"/rx="0"/' "$SVG" >"$MASKABLE"
+grep -q 'rx="0"' "$MASKABLE" || { echo "error: expected rx=\"112\" in $SVG" >&2; exit 1; }
+render "$MASKABLE" 512 "$DIR/web/wordcraft-maskable-512.png"
+
 # Windows .ico.
 ICO_PNGS=()
 for s in 16 20 24 32 40 48 64 128 256; do

@@ -79,6 +79,7 @@ pub mod table_pen;
 pub mod table_resize;
 pub mod table_ruler;
 pub mod theme;
+pub mod touch;
 pub mod widgets;
 pub mod window_geometry;
 pub mod wordart_menus;
@@ -455,6 +456,8 @@ pub struct WordApp {
     pub(crate) synthetic: Vec<egui::Event>,
     /// macOS: the primary button went down with Control, so it is being read as the secondary.
     control_click: bool,
+    /// Fingers on the page: swipes scroll, taps click (touch screens and tablets).
+    pub(crate) touch: touch::TouchGestures,
     /// Badge rects recorded during layout for the current keytip phase (cleared by `logic`, painted by `show`).
     pub(crate) keytip_rects: Vec<(egui::Rect, String)>,
     /// The Navigation pane's search box takes the keyboard on its next frame (Ctrl+F, #712).
@@ -591,6 +594,7 @@ impl WordApp {
             pending_shots: Vec::new(),
             synthetic: Vec::new(),
             control_click: false,
+            touch: Default::default(),
             keytip_rects: Vec::new(),
             nav_search_focus: false,
             styled: false,
@@ -1961,6 +1965,9 @@ impl WordApp {
         if cfg!(target_os = "macos") {
             control_click_as_secondary(&mut raw.events, &mut self.control_click);
         }
+        // With a Draw tab pen, eraser or lasso on, a finger on the page draws.
+        let draw = self.session.view.draw.mode != wordcraft_engine::cmd::draw::DrawMode::Select;
+        self.touch.hook(raw, draw);
         if self.synthetic.is_empty() {
             return;
         }
@@ -2043,6 +2050,11 @@ impl WordApp {
             self.sent_title = title;
         }
         self.sync_full_screen(&ctx);
+        // Next frame's touches act on the page only when nothing sits on top of it.
+        self.touch.end_frame(self.dialog.is_some() || self.ui.backstage || egui::Popup::is_any_open(&ctx));
+        if self.touch.needs_repaint() {
+            ctx.request_repaint();
+        }
         self.frame_ms = now_ms() - t0;
         // Typing and formatting land here, after `logic` has reported.
         self.report_dirty();
@@ -3696,6 +3708,78 @@ mod tests {
         }
         assert_eq!(a.canvas.scroll_offset, before, "holding a press on the ribbon leaves the document where it is");
         frame(&mut a, vec![btn(ribbon, false)]);
+    }
+
+    /// Fingers on the page (crate::touch), as a tablet's browser reports them: a swipe scrolls
+    /// the document instead of selecting text, a tap puts the caret where it lands, and touch,
+    /// hold and drag selects.
+    #[test]
+    fn finger_swipes_scroll_the_page_and_taps_place_the_caret() {
+        let ctx = egui::Context::default();
+        let mut a = app();
+        a.run("text.insert", json!({"text": "lorem ipsum dolor sit amet consectetur ".repeat(1200)})).unwrap();
+        a.run("caret.docStart", json!({})).unwrap();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1280.0, 800.0));
+        let t = std::cell::Cell::new(0.0);
+        let frame = |a: &mut WordApp, events: Vec<egui::Event>| {
+            t.set(t.get() + 1.0 / 60.0);
+            let mut input = egui::RawInput { events, time: Some(t.get()), screen_rect: Some(screen), ..Default::default() };
+            a.raw_input_hook(&mut input);
+            ctx.run_ui(input, |ui| {
+                a.logic(ui.ctx());
+                a.ui(ui);
+            })
+            .drop_without_applying_deltas();
+        };
+        for _ in 0..3 {
+            frame(&mut a, Vec::new());
+        }
+        let touch = |phase, pos| egui::Event::Touch { device_id: egui::TouchDeviceId(0), id: egui::TouchId(1), phase, pos, force: None };
+        let button =
+            |pos, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+        // eframe's web runner: the first finger is also the mouse.
+        let down = |p| vec![button(p, true), touch(egui::TouchPhase::Start, p)];
+        let moved = |p| vec![egui::Event::PointerMoved(p), touch(egui::TouchPhase::Move, p)];
+        let up = |p| vec![button(p, false), egui::Event::PointerGone, touch(egui::TouchPhase::End, p)];
+
+        let at = a.canvas.canvas_rect.unwrap().center();
+        let start = a.canvas.scroll_offset.y;
+        let caret = a.session.sel.clone();
+        frame(&mut a, down(at));
+        for i in 1..=10 {
+            frame(&mut a, moved(at - egui::vec2(0.0, 20.0 * i as f32)));
+        }
+        assert!((a.canvas.scroll_offset.y - start - 200.0).abs() < 0.5, "the page follows the finger: {}", a.canvas.scroll_offset.y - start);
+        frame(&mut a, up(at - egui::vec2(0.0, 200.0)));
+        frame(&mut a, Vec::new());
+        assert!(a.canvas.scroll_offset.y > start + 200.0, "a flick coasts on");
+        assert_eq!(a.session.sel, caret, "the swipe selected nothing");
+
+        frame(&mut a, down(at));
+        frame(&mut a, up(at));
+        frame(&mut a, Vec::new());
+        assert!(a.session.sel.is_collapsed() && a.session.sel != caret, "a tap moved the caret to the finger: {:?}", a.session.sel);
+        let tapped = a.session.sel.clone();
+
+        frame(&mut a, down(at));
+        // The finger rests before it moves: a hold.
+        t.set(t.get() + 0.6);
+        for i in 1..=6 {
+            frame(&mut a, moved(at + egui::vec2(30.0 * i as f32, 0.0)));
+        }
+        frame(&mut a, up(at + egui::vec2(180.0, 0.0)));
+        frame(&mut a, Vec::new());
+        assert!(!a.session.sel.is_collapsed(), "touch, hold and drag selected text");
+        assert_eq!(a.session.sel.anchor, tapped.anchor, "from where the finger went down");
+
+        t.set(t.get() + 1.0);
+        for _ in 0..2 {
+            frame(&mut a, down(at));
+            frame(&mut a, up(at));
+            frame(&mut a, Vec::new());
+        }
+        let (start, end) = (a.session.sel.anchor.off.min(a.session.sel.focus.off), a.session.sel.anchor.off.max(a.session.sel.focus.off));
+        assert!(start < tapped.anchor.off && tapped.anchor.off < end && end - start <= 12, "a double tap selected the word: {:?}", a.session.sel);
     }
 
     /// The control channel's `ui.wheel` scrolls the canvas like a mouse wheel over it.

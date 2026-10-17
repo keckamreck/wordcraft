@@ -1,0 +1,22 @@
+{
+  "name": "WordCraft",
+  "short_name": "WordCraft",
+  "description": "Open-source word processor: write, format and lay out documents in the browser, on desktops and tablets.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e6e6e6",
+  "theme_color": "#f0f0f0",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "icons/wordcraft-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/wordcraft-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/wordcraft-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "New document", "url": "./" },
+    { "name": "Sample document", "url": "./?sample" }
+  ]
+}

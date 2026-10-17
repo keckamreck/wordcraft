@@ -8,9 +8,57 @@ static site in `wordcraft-web-<version>/`:
 | `index.html` | The page. It loads everything through relative URLs. |
 | `wordcraft-web-<hash>.js` | wasm-bindgen glue (generated, ES module) |
 | `wordcraft-web-<hash>_bg.wasm` | The app, about 13 MB, or 5 MB with compression |
+| `manifest.webmanifest`, `icons/` | Web app manifest and icons: the site installs as an app ([below](#install-as-an-app-android-tablets)) |
 | `_headers`, `.htaccess` | Sample header rules for Netlify/Cloudflare Pages and Apache |
 
 There is no server-side code. Upload the folder's contents anywhere that serves static files.
+
+## Deploy on Vercel
+
+The repository deploys to [Vercel](https://vercel.com) as it is: `vercel.json` at the root tells
+Vercel to run `packaging/web/vercel-build.sh` and serve `dist/web`, with the headers below.
+
+1. On vercel.com: **Add New… › Project**, import this GitHub repository and keep every setting
+   Vercel proposes (they come from `vercel.json`; there is no framework preset, no install step).
+2. **Deploy.** Every later push deploys again by itself: pushes to the default branch go to the
+   production URL, pushes to other branches get preview URLs.
+
+The build installs Rust (`RUST_TOOLCHAIN`, pinned in the script) and Trunk (pinned, SHA-256
+checked) on Vercel's build machine, and Trunk fetches wasm-bindgen and wasm-opt. A build from
+scratch takes about 15–25 minutes on Vercel's standard machine, within its 45-minute limit.
+With the Vercel CLI instead: `vercel` (preview) or `vercel --prod` from the repository root.
+
+## Install as an app (Android tablets)
+
+The site is an installable web app (`manifest.webmanifest`): it opens in its own window with
+its own icon, without the browser's address bar, in portrait and landscape.
+
+- **Android tablet or phone (Chrome):** open the site, then **⋮ › Add to home screen › Install**
+  (or **Install app**). WordCraft then starts from the launcher like any other app. Long-press
+  the icon for **Sample document**.
+- **ChromeOS, Windows, macOS, Linux (Chrome or Edge):** the install icon at the right of the
+  address bar, or **⋮ › Cast, save and share › Install page as app**.
+- **iPad (Safari):** **Share › Add to Home Screen**.
+
+Installing needs HTTPS (Vercel serves it). There is no offline mode: the app loads from the
+site each time it starts (the large `.wasm` comes from the browser's cache after the first
+visit).
+
+On a touch screen the page follows the fingers (`crates/ui-egui/src/touch.rs`):
+
+| Gesture on the page | Does |
+|---|---|
+| Swipe | Scrolls; a flick coasts on. In Read Mode a swipe turns the page |
+| Tap | Puts the caret there, and the on-screen keyboard comes up for typing |
+| Double tap / triple tap | Selects the word / the paragraph |
+| Touch and hold, then drag | Selects text from where the finger went down (or moves a picture or shape) |
+| Touch and hold, then lift | Opens the context menu |
+| Two fingers | Pinch to zoom; move together to scroll |
+
+Touches on the ribbon, panes and dialogs act as clicks and drags, and with a Draw tab pen,
+pencil, highlighter, eraser or lasso chosen the finger draws on the page. The on-screen keyboard
+shrinks the app rather than covering the page (`interactive-widget=resizes-content`). A larger
+interface for fingers: **File › Options › General › Interface size**, for example 125%.
 
 ## Any path works
 
